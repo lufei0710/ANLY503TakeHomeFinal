@@ -1,0 +1,195 @@
+---
+title: "Final"
+output: html_document
+---
+
+```{r}
+df = read.csv("~/Desktop/google/googleplaystore.csv")
+
+```
+
+
+
+```{r}
+library(ggplot2)
+df = df[df$Type != "0",]
+df = df[df$Type != "NaN",]
+df$Type = as.factor(as.character(df$Type))
+df = df[! is.na(df$Rating), ]
+
+str(df)
+```
+```{r}
+df$Reviews = as.numeric(df$Reviews)
+df = df[!df$Content.Rating %in% c("Adults only 18+", "Unrated"),]
+df$Content.Rating = as.factor(as.character(df$Content.Rating))
+summary(df$Installs)
+```
+
+
+```{r}
+ggplot(data = df, aes(x=Content.Rating, y=Reviews)) +
+  geom_boxplot(aes(fill=Content.Rating)) +
+  ggtitle("Content Rating and Number of Reviews") +
+  facet_grid(Type ~ .) +
+  stat_summary(fun.y=mean, geom="point", shape=23, size=4)
+```
+
+
+
+
+```{r}
+library(plyr)
+mu <- ddply(df, "Type", summarise, grp.mean=mean(Rating))
+head(mu)
+
+ggplot(df, aes(x=Rating, color=Type)) + 
+  geom_histogram(binwidth=0.1,fill="white", position="identity") +
+  geom_vline(data=mu, aes(xintercept=grp.mean, color=Type),
+             linetype="dashed")+
+  theme(legend.position="right") +
+  xlim(2, 5) +
+  ggtitle("Distribution of Ratings by Paid or Free")
+  
+```
+
+
+```{r}
+ggplot(data=df[df$Type == 'Paid',]) +
+  geom_point(mapping=aes(x = Reviews, y = Rating, color = Content.Rating)) +
+  geom_smooth(mapping=aes(x = Reviews, y = Rating)) +
+  ggtitle("Number of Reviews vs. Rating")
+```
+
+plotly
+
+```{r}
+df$Price = as.character(df$Price)
+df$Price = as.numeric(gsub("\\$", "", df$Price))
+summary(df$Price)
+```
+
+```{r}
+library(plotly)
+
+Sys.setenv("plotly_username"="lufeiwang")
+Sys.setenv("plotly_api_key"="7lEHmZa7CcCzu6ZQQllU")
+
+p <- plot_ly(data = df[df$Type == "Paid" & df$Price<15, ], x = ~Price, y = ~Rating ,
+             marker = list(size = 10,
+                       color = 'rgba(255, 182, 193, .9)',
+                       line = list(color = 'rgba(152, 0, 0, .8)',
+                                   width = 2)), type = "scatter") %>%
+            layout(title = 'Price vs. Rating',
+                   yaxis = list(zeroline = FALSE),
+                   xaxis = list(zeroline = FALSE))
+
+# api_create(p, filename="scatter1")
+p
+saveWidget(p, file="part2_2.html", selfcontained = TRUE, libdir =NULL,background = "white")
+
+```
+
+
+```{r}
+df$Installs = factor(as.character(df$Installs), levels = c("1+", "5+","10+", "50+", "100+", "500+", "1,000+", "5,000+",
+                                                           "10,000+",
+                                                           "50,000+", "100,000+", "500,000+", "1,000,000+", "5,000,000+",
+                                                           "10,000,000+", "50,000,000+", "100,000,000+", "500,000,000+",
+                                                           "1,000,000,000+"))
+table(df$Installs)
+
+p <- plot_ly( data= df, 
+  x = ~Installs,
+  name = "Installs",
+  type = "histogram"
+  ) %>%  layout(title = 'Distribution of Number of Installs')
+
+p
+saveWidget(p, file="part1_3.html", selfcontained = TRUE, libdir =NULL,background = "white")
+```
+
+netork
+
+```{r}
+library(networkD3)
+library(htmlwidgets)
+```
+
+
+
+```{r}
+df = read.csv("~/Desktop/reviews.csv")
+df
+```
+
+```{r}
+df = df[order(-df$frea),] 
+colnames(df) = c("index", "value", "source", "target")
+
+```
+
+```{r}
+df = head(df, 250)
+```
+
+```{r}
+sources = df$source 
+targets = df$target
+nodes = c(as.character(sources), as.character(targets))
+```
+
+```{r}
+t = table(nodes)
+nodes = as.data.frame(t)
+```
+
+```{r}
+nodes$index = c(0:214)
+colnames(nodes) = c('name', 'size', 'index')
+```
+
+```{r}
+library(plyr)
+
+df$source = mapvalues(df$source, from = nodes$name, to = nodes$index)
+df$target = mapvalues(df$target, from = nodes$name, to = nodes$index)
+
+
+
+```
+
+
+Below is a network showing the most common bigrams in the lyrics throughout the years
+
+```{r}
+p = forceNetwork(Links = df, Nodes = nodes,
+            Source = "source", Target = "target", Group = "index",
+            Value = "value", NodeID = "name", opacity = 0.8, fontSize = 30)
+```
+
+```{r}
+saveWidget(p, file="part1_4.html", selfcontained = TRUE, libdir =NULL,background = "white")
+
+```
+
+```{r}
+write.csv(df, file = "google_cleaned.csv")
+
+```
+
+
+
+```{r}
+library(threejs)
+library(htmlwidgets)
+df = df[df$Type == 'Paid',]
+MyJ3=scatterplot3js(df$Price,df$Reviews,df$Rating,
+  color = c("grey", "red", "blue")[as.factor(df$Content.Rating)],
+  axisLabels=c("Price","Reviews","Rating"), size = 0.4)
+
+
+MyJ3
+saveWidget(MyJ3, file="part2_3.html", selfcontained = TRUE, libdir =NULL,background = "white")
+```
+

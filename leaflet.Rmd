@@ -1,0 +1,106 @@
+
+
+
+
+
+```{r}
+
+library(raster)
+library(leaflet)
+library(tidyverse)
+library(tigris)
+
+library(rgdal)
+
+
+states <- states(cb=T)
+ 
+states %>% 
+  leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(popup=~NAME)
+
+starbucks <- read.csv("~/Desktop/Starbucks.csv", stringsAsFactors=F)
+starbucks
+
+```
+
+
+```{r}
+sb_state <- starbucks %>%
+  group_by(State) %>%
+  summarize(total=n()) %>% 
+# Some quick adjustments to the the dataframe to clean up names
+  mutate(type = "Starbucks")
+
+```
+
+```{r}
+states_merged_sb <- geo_join(states, sb_state, "STUSPS", "State")
+
+pal <- colorNumeric("Greens", domain=states_merged_sb$total)
+
+# Getting rid of rows with NA values
+# Using the Base R method of filtering subset() because we're dealing with a SpatialPolygonsDataFrame and not a normal data frame, thus filter() wouldn't work
+
+states_merged_sb <- subset(states_merged_sb, !is.na(total))
+
+# Setting up the pop up text
+popup_sb <- paste0("Total: ", as.character(states_merged_sb$total))
+
+```
+
+```{r}
+starbucks$Features_Stations = as.factor(starbucks$Features_Stations)
+summary(starbucks$Features_Stations)
+```
+
+```{r}
+sb_city <- starbucks %>%
+  group_by(City) %>%
+  summarize(total=n())
+# sb_city = sb_city[order(-sb_city$total),]
+# sb_city = head(sb_city, 10)
+
+cities <- read.csv(textConnection("City,Lat,Long,Pop 
+Boston,42.3601,-71.0589,645966
+Hartford,41.7627,-72.6743,125017
+New York,40.7127,-74.0059,8406000
+Philadelphia,39.9500,-75.1667,1553000
+Pittsburgh,40.4397,-79.9764,305841
+Providence,41.8236,-71.4222,177994
+"))
+
+
+df1 = sb_city[sb_city$City %in% as.character(cities$City), ]
+df2 = cbind(df1, cities)
+df2
+```
+
+
+
+```{r}
+library(htmlwidgets)
+p = leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(-98.483330, 38.712046, zoom = 4) %>% 
+  addPolygons(data = states_merged_sb , 
+              fillColor = ~pal(states_merged_sb$total), 
+              fillOpacity = 0.7, 
+              weight = 0.2, 
+              smoothFactor = 0.2, 
+              popup = ~popup_sb) %>%
+  addLegend(pal = pal, 
+            values = states_merged_sb$total, 
+            position = "bottomright", 
+            title = "Starbucks") %>%
+  addCircleMarkers(data = starbucks, lng = ~Longitude, lat = ~Latitude, radius = 0.01) %>%
+  addCircles(data = df2, lng = ~Long, lat = ~Lat, weight = 1,
+    radius = ~sqrt(total) * 100, popup = ~City
+  )
+
+
+saveWidget(p, file="addi.html", selfcontained = TRUE, libdir =NULL,background = "white")
+
+```
+
